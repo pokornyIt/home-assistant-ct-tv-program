@@ -1,0 +1,53 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+
+# Test, lint, type-check, and coverage artifacts
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyright/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Python build artifacts
+build/
+dist/
+*.egg-info/
+
+# Local uv cache
+.uv-cache/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+secrets.yaml
+
+# Home Assistant runtime data
+.storage/
+home-assistant.log*
+home-assistant_v2.db*
+
+# Editors
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+
+# Operating system files
+.DS_Store
+Desktop.ini
+Thumbs.db
+.codex/
