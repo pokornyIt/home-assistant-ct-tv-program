@@ -30,6 +30,9 @@ dist/
 !.env.example
 secrets.yaml
 
+# Raw Czech Television exports are local-only due to redistribution terms
+fixtures/**/*.json
+
 # Home Assistant runtime data
 .storage/
 home-assistant.log*

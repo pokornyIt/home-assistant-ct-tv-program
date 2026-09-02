@@ -6,7 +6,9 @@ These instructions apply to the entire repository.
 
 GitHub issues define the product scope and implementation roadmap.
 
-Read the active issue and relevant open roadmap issues before making architectural decisions. Implement only the active issue unless the user explicitly expands the scope.
+Read the active issue and relevant open roadmap issues before making architectural
+decisions. Implement only the active issue unless the user explicitly expands the
+scope.
 
 The project is a Home Assistant integration for Czech Television programme data.
 
@@ -18,22 +20,26 @@ The primary product goals are:
 * provide useful programme metadata;
 * provide accessibility metadata suitable for Home Assistant UI, automations, Assist, and voice output.
 
-Accessibility is a first-class use case. Do not remove or unnecessarily simplify metadata related to audio description, subtitles, deaf viewers, age rating, or similar programme properties.
+Accessibility is a first-class use case. Do not remove or unnecessarily simplify
+metadata related to audio description, subtitles, deaf viewers, age rating, or similar
+programme properties.
 
 ## Communication and language
 
 * Communicate with the user in Czech.
 * Write source code and technical artifacts in English.
 * Keep English and Czech translation files synchronized whenever user-facing integration text changes.
-* Use English for identifiers, comments, docstrings, tests, logs, errors, configuration comments, documentation, commit messages, issue implementation summaries, and pull request text.
+* Use English for identifiers, comments, docstrings, tests, logs, errors,
+  configuration comments, documentation, commit messages, issue implementation
+  summaries, and pull request text.
 * Use `pokornyIt` whenever the repository owner or author's name is required.
 
 ## Data source
 
 Use only the official Czech Television registered programme export documented at:
 
-* https://www.ceskatelevize.cz/xml/tv-program/
-* https://www.ceskatelevize.cz/xml/tv-program/informace/
+* [TV programme export](https://www.ceskatelevize.cz/xml/tv-program/)
+* [TV programme export information](https://www.ceskatelevize.cz/xml/tv-program/informace/)
 
 Do not build production functionality on undocumented or internal Czech Television APIs such as `/api/tv-program`.
 
@@ -41,7 +47,8 @@ Prefer the official JSON representation using `json=1` unless an active issue ex
 
 The registered export username is configuration data and must not be hard-coded into production code.
 
-Never require or store activation hashes, passwords, browser cookies, API tokens, or credentials obtained from Czech Television applications.
+Never require or store activation hashes, passwords, browser cookies, API tokens, or
+credentials obtained from Czech Television applications.
 
 Respect Czech Television request limits.
 
@@ -52,7 +59,8 @@ For research tools and tests that perform live requests:
 * do not perform unnecessary polling;
 * do not parallelize programme export requests.
 
-Production integration code should minimize network requests and determine current/next programme locally from cached schedule data whenever possible.
+Production integration code should minimize network requests and determine current/next
+programme locally from cached schedule data whenever possible.
 
 ## Programme data semantics
 
@@ -71,17 +79,22 @@ Keep the source duration separately as programme metadata.
 
 Do not silently invent an effective end for the last known programme if the next programme is unavailable.
 
-Czech Television programme responses may span calendar midnight. Treat the returned data as a broadcasting schedule, not as a simple calendar-day list.
+Czech Television programme responses may span calendar midnight. Treat the returned
+data as a broadcasting schedule, not as a simple calendar-day list.
 
-Use timezone-aware datetimes and Home Assistant datetime helpers. Do not implement programme selection using naive local datetimes.
+Use timezone-aware datetimes and Home Assistant datetime helpers. Do not implement
+programme selection using naive local datetimes.
 
-Normalize inconsistent empty source values at the data boundary. The JSON export may represent empty XML elements as objects such as `{}` rather than `null` or empty strings.
+Normalize inconsistent empty source values at the data boundary. The JSON export may
+represent empty XML elements as objects such as `{}` rather than `null` or empty
+strings.
 
 Do not leak source-format quirks into Home Assistant entities or the rest of the application.
 
 ## Home Assistant architecture
 
-Target the current Home Assistant architecture defined by the active roadmap issues and current Home Assistant developer documentation.
+Target the current Home Assistant architecture defined by the active roadmap issues
+and current Home Assistant developer documentation.
 
 Use native Home Assistant integration patterns:
 
@@ -110,7 +123,8 @@ ct_tv_program
 
 A selected Czech Television channel should normally be represented as one Home Assistant device.
 
-Avoid creating large numbers of entities for individual programme fields when attributes or another native Home Assistant representation provide a cleaner model.
+Avoid creating large numbers of entities for individual programme fields when
+attributes or another native Home Assistant representation provide a cleaner model.
 
 Do not expose internal transport details or raw Czech Television payloads as user-facing entities.
 
@@ -122,7 +136,8 @@ Use Home Assistant's shared asynchronous HTTP infrastructure for production netw
 
 Do not use synchronous `requests` in integration code.
 
-Use explicit request timeouts and handle temporary network failures without destroying previously valid schedule data when retaining cached data is safe.
+Use explicit request timeouts and handle temporary network failures without destroying
+previously valid schedule data when retaining cached data is safe.
 
 Do not perform network access from entity properties.
 
@@ -147,7 +162,8 @@ Do not place unrelated behaviour into `__init__.py`, `config_flow.py`, or entity
 
 Keep Czech Television protocol details outside Home Assistant entity classes.
 
-Prefer a small typed client/parser boundary so raw upstream data is converted into stable internal models before Home Assistant consumes it.
+Prefer a small typed client/parser boundary so raw upstream data is converted into
+stable internal models before Home Assistant consumes it.
 
 Avoid premature abstractions and do not implement roadmap work before its issue.
 
@@ -191,7 +207,8 @@ aspect_ratio
 
 This list is guidance, not a requirement to expose every upstream field.
 
-Preserve useful accessibility information even if it is not initially exposed as a dedicated Home Assistant entity.
+Preserve useful accessibility information even if it is not initially exposed as a
+dedicated Home Assistant entity.
 
 ## Python toolchain and style
 
@@ -250,7 +267,9 @@ Never commit:
 
 Avoid logging complete request URLs when doing so would expose configuration values unnecessarily.
 
-Diagnostics must contain only information useful for troubleshooting and should not include raw schedules when a smaller normalized diagnostic representation is sufficient.
+Diagnostics must contain only information useful for troubleshooting and should not
+include raw schedules when a smaller normalized diagnostic representation is
+sufficient.
 
 ## Testing and validation
 
@@ -300,9 +319,11 @@ Do not report a check as passing if it could not be run.
 * Do not edit generated files manually when a generator is available.
 * Keep manifest metadata, translations, tests, documentation, and fixtures consistent.
 * Do not broaden an issue into later roadmap work without explicit user approval.
-* Record important architectural decisions and research findings in the active GitHub issue when issue-based tracking is being used.
+* Record important architectural decisions and research findings in the active GitHub
+  issue when issue-based tracking is being used.
 * Do not mark work complete before relevant validation passes.
-* Report implemented behaviour, architectural decisions, validation results, discovered upstream quirks, and intentionally deferred work.
+* Report implemented behaviour, architectural decisions, validation results,
+  discovered upstream quirks, and intentionally deferred work.
 
 ## GitHub workflow
 
@@ -315,9 +336,11 @@ Before starting implementation:
 3. inspect current repository instructions;
 4. inspect existing implementation before proposing structural changes.
 
-Prefer one focused branch and pull request per implementation issue unless the issue explicitly defines another workflow.
+Prefer one focused branch and pull request per implementation issue unless the issue
+explicitly defines another workflow.
 
-Do not close research or implementation issues merely because code exists. Confirm that the issue acceptance criteria are satisfied.
+Do not close research or implementation issues merely because code exists. Confirm
+that the issue acceptance criteria are satisfied.
 
 ## Project-local Codex skills
 
@@ -330,3 +353,16 @@ Project-local skills live under:
 Skills may be introduced later for repeatable project workflows.
 
 Do not assume a project-local skill exists unless it is present in the repository.
+
+## Markdown tables
+
+Surround every Markdown table with comments that disable and then re-enable the
+MD013 line-length rule:
+
+```markdown
+<!-- markdownlint-disable MD013 -->
+| Column | Column |
+| ------ | ------ |
+| Value  | Value  |
+<!-- markdownlint-enable MD013 -->
+```
