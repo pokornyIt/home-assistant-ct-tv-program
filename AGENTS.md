@@ -234,14 +234,20 @@ Scripts used to inspect Czech Television data may live under:
 scripts/
 ```
 
-Representative API responses used by tests or research may be stored as fixtures.
+Raw Czech Television programme responses must never be committed, published,
+redistributed, or embedded in repository fixtures or examples. This prohibition also
+applies to pull requests, release assets, CI artifacts, snapshots, logs, and
+documentation attachments.
 
-Fixtures must:
+Tests, examples, and documentation may use only:
 
-* contain no activation hashes, passwords, tokens, cookies, or private credentials;
-* contain only data received from the official programme export;
-* have deterministic filenames;
-* remain as close as practical to the original response when intended as raw fixtures.
+* synthetic fixtures based on the documented or observed response structure;
+* derived statistics and findings that do not reproduce a machine-readable schedule;
+* manually constructed edge-case data.
+
+Research tools may download raw responses locally when explicitly required. All such
+downloads must remain ignored by Git and untracked, and must not be copied into any
+published artifact.
 
 Do not make normal unit tests depend on live Czech Television access.
 
