@@ -19,7 +19,11 @@ from custom_components.ct_tv_program.parser import PRAGUE_TIME_ZONE
 
 
 def _programme(**overrides: object) -> dict[str, object]:
-    """Build a complete synthetic programme payload."""
+    """Build a complete synthetic programme payload.
+
+    :param **overrides: Values replacing defaults in the payload.
+    :return: Synthetic programme payload.
+    """
     programme: dict[str, object] = {
         "linky": {
             "program": "https://example.test/programme",
@@ -60,7 +64,12 @@ def _programme(**overrides: object) -> dict[str, object]:
 
 
 def _schedule(*programmes: object, wrapped: bool = True) -> dict[str, object]:
-    """Build a synthetic broadcasting-day schedule payload."""
+    """Build a synthetic broadcasting-day schedule payload.
+
+    :param *programmes: Synthetic programme payloads.
+    :param wrapped: Whether to include the export's top-level wrapper.
+    :return: Synthetic schedule payload.
+    """
     schedule: dict[str, object] = {
         "@attributes": {
             "datum_vysilani": "2026-09-03",
@@ -179,7 +188,10 @@ def test_optional_scalars_accept_numbers_but_not_boolean_values() -> None:
     ["ad", "skryte_titulky", "neslysici", "live", "premiera", "puvodni_zneni", "hd", "cb"],
 )
 def test_unknown_boolean_flags_fail_explicitly(field: str) -> None:
-    """Unknown source status values never become truthy implicitly."""
+    """Unknown source status values never become truthy implicitly.
+
+    :param field: Boolean source field under test.
+    """
     icons = cast("dict[str, object]", _programme()["ikonky"])
     icons[field] = "unknown"
 
@@ -192,7 +204,11 @@ def test_unknown_boolean_flags_fail_explicitly(field: str) -> None:
     [("1/8", (1, 8)), ({}, (None, None)), ("", (None, None)), ("episode one", (None, None))],
 )
 def test_episode_parsing_is_safe(raw_episode: object, expected: tuple[int | None, int | None]) -> None:
-    """Only the documented episode/count shape is converted to integers."""
+    """Only the documented episode/count shape is converted to integers.
+
+    :param raw_episode: Source episode value.
+    :param expected: Expected normalized episode pair.
+    """
     programme = parse_programme(_programme(dil=raw_episode))
 
     assert (programme.episode, programme.episode_count) == expected
@@ -200,7 +216,11 @@ def test_episode_parsing_is_safe(raw_episode: object, expected: tuple[int | None
 
 @pytest.mark.parametrize(("sound", "aspect_ratio"), [("D", "4:3"), ("FUTURE", "21:9-FUTURE")])
 def test_open_ended_metadata_values_are_preserved(sound: str, aspect_ratio: str) -> None:
-    """Known and future sound/aspect values remain lossless strings."""
+    """Known and future sound/aspect values remain lossless strings.
+
+    :param sound: Source sound metadata.
+    :param aspect_ratio: Source aspect-ratio metadata.
+    """
     icons = cast("dict[str, object]", _programme()["ikonky"])
     icons.update({"zvuk": sound, "pomer": aspect_ratio})
 
@@ -212,7 +232,11 @@ def test_open_ended_metadata_values_are_preserved(sound: str, aspect_ratio: str)
 
 @pytest.mark.parametrize(("age_rating", "expected"), [("8+", "8+"), ({}, None), ("", None)])
 def test_age_rating_is_normalized(age_rating: object, expected: str | None) -> None:
-    """Age ratings remain open text while empty values become None."""
+    """Age ratings remain open text while empty values become None.
+
+    :param age_rating: Source age-rating value.
+    :param expected: Expected normalized age rating.
+    """
     icons = cast("dict[str, object]", _programme()["ikonky"])
     icons["labeling"] = age_rating
 
@@ -240,14 +264,21 @@ def test_missing_image_group_is_supported() -> None:
     ],
 )
 def test_malformed_required_programme_values_fail(overrides: dict[str, object], message: str) -> None:
-    """Corrupt required fields never create a partial programme."""
+    """Corrupt required fields never create a partial programme.
+
+    :param overrides: Invalid values replacing payload defaults.
+    :param message: Expected error message fragment.
+    """
     with pytest.raises(CtTvProgramParseError, match=message):
         parse_programme(_programme(**overrides))
 
 
 @pytest.mark.parametrize("wrapped", [True, False])
 def test_parse_successful_schedule_response(wrapped: bool) -> None:
-    """Both observed wrapper shapes produce immutable schedule data."""
+    """Both observed wrapper shapes produce immutable schedule data.
+
+    :param wrapped: Whether to include the export's top-level wrapper.
+    """
     schedule = parse_schedule(_schedule(_programme(), wrapped=wrapped))
 
     assert schedule.channel == "ct1"
@@ -282,7 +313,10 @@ def test_optional_generation_time_variants_are_normalized() -> None:
 
 @pytest.mark.parametrize("payload", [{"error": "not found"}, {"program": {"error": "not found"}}])
 def test_not_available_response_has_a_dedicated_error(payload: dict[str, object]) -> None:
-    """The export horizon response is not confused with an empty schedule."""
+    """The export horizon response is not confused with an empty schedule.
+
+    :param payload: Synthetic unavailable-schedule response.
+    """
     with pytest.raises(CtTvProgramScheduleNotAvailableError, match="not found"):
         parse_schedule(payload)
 
@@ -313,6 +347,9 @@ def test_not_available_response_has_a_dedicated_error(payload: dict[str, object]
     ],
 )
 def test_malformed_schedule_structure_fails(payload: object) -> None:
-    """Raw objects cannot escape through a structurally invalid schedule."""
+    """Raw objects cannot escape through a structurally invalid schedule.
+
+    :param payload: Structurally invalid synthetic response.
+    """
     with pytest.raises(CtTvProgramParseError):
         parse_schedule(payload)

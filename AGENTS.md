@@ -219,8 +219,14 @@ dedicated Home Assistant entity.
 * Keep `uv.lock` synchronized.
 * Do not use `pip install` for project setup.
 * Do not add `requirements.txt` for development tooling.
+* Run Ruff and pydoclint for Python documentation validation; use Sphinx-style
+  sections that match typed signatures without duplicating type annotations.
 * Do not add a production dependency without a concrete need and an explanation in the change summary.
 * Add precise type annotations and concise English docstrings to integration code.
+* Every Python function and method, including private and protected functions
+  and methods, must have at least a concise one-line docstring. Add structured
+  `:param`, `:return:`, and `:raises:` sections when the signature or behaviour
+  requires them.
 * Prefer small, async, deterministic functions and Home Assistant helpers.
 * Do not perform blocking I/O in the Home Assistant event loop.
 
@@ -325,6 +331,7 @@ uv run ruff format --check .
 uv run ruff check .
 uv run pyright
 uv run pytest
+uv run pydoclint --config=pyproject.toml .
 uv run pre-commit run --all-files
 ```
 

@@ -61,7 +61,10 @@ def test_calculate_timings_reports_overlap() -> None:
 
 
 def test_collect_rejects_short_delay(tmp_path: Path) -> None:
-    """Live collection cannot bypass the issue's conservative request delay."""
+    """Live collection cannot bypass the issue's conservative request delay.
+
+    :param tmp_path: Temporary directory supplied by pytest.
+    """
     with pytest.raises(ResearchError, match="at least 90 seconds"):
         collect_fixtures(
             username="test",
@@ -72,7 +75,11 @@ def test_collect_rejects_short_delay(tmp_path: Path) -> None:
 
 
 def test_export_username_is_loaded_from_dotenv(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """The request username comes from CT_USER in the selected .env file."""
+    """The request username comes from CT_USER in the selected .env file.
+
+    :param tmp_path: Temporary directory supplied by pytest.
+    :param monkeypatch: Pytest environment monkeypatch fixture.
+    """
     dotenv_path = tmp_path / ".env"
     dotenv_path.write_text("CT_USER=fixture-user\n", encoding="utf-8")
     monkeypatch.delenv("CT_USER", raising=False)

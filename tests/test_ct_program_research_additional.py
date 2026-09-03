@@ -22,6 +22,7 @@ def _programme(
     duration: str = "025:00",
     sound: object = "S",
 ) -> research.JsonObject:
+    """Build a synthetic raw programme payload."""
     return {
         "linky": {"program": "https://example.test/show", "ivysilani": {}},
         "datum": day,
@@ -60,6 +61,7 @@ def _programme(
 
 
 def _schedule(*programmes: research.JsonObject) -> research.JsonObject:
+    """Build a synthetic raw schedule payload."""
     return {
         "@attributes": {
             "datum_vysilani": "2026-09-02",
@@ -71,21 +73,42 @@ def _schedule(*programmes: research.JsonObject) -> research.JsonObject:
 
 
 class _Response:
+    """Represent a synthetic synchronous HTTP response."""
+
     def __init__(self, payload: bytes) -> None:
+        """Initialize a synthetic response.
+
+        :param payload: Response body bytes.
+        """
         self.payload = payload
 
     def __enter__(self) -> Self:
+        """Enter the response context.
+
+        :return: This response.
+        """
         return self
 
     def __exit__(self, *args: object) -> None:
+        """Exit the response context.
+
+        :param *args: Context-manager exception details.
+        """
         return None
 
     def read(self) -> bytes:
+        """Return the response body bytes.
+
+        :return: Response body bytes.
+        """
         return self.payload
 
 
 def test_fixture_properties_use_attributes_and_filename_fallback(tmp_path: Path) -> None:
-    """Fixture metadata comes from attributes and has deterministic fallbacks."""
+    """Fixture metadata comes from attributes and has deterministic fallbacks.
+
+    :param tmp_path: Temporary directory supplied by pytest.
+    """
     schedule = _schedule(_programme())
     fixture = research.Fixture(tmp_path / "ct1-sample.json", schedule, schedule, [])
     fallback = research.Fixture(tmp_path / "ct2-sample.json", {}, {}, [])
@@ -119,9 +142,20 @@ def test_scalar_and_request_helpers() -> None:
     ],
 )
 def test_download_rejects_invalid_responses(monkeypatch: pytest.MonkeyPatch, payload: bytes, message: str) -> None:
-    """Downloads reject malformed and non-object JSON responses."""
+    """Downloads reject malformed and non-object JSON responses.
+
+    :param monkeypatch: Pytest monkeypatch fixture.
+    :param payload: Synthetic response body.
+    :param message: Expected error message fragment.
+    """
 
     def fake_urlopen(_request: object, *, timeout: int) -> _Response:
+        """Return a synthetic response for the patched downloader.
+
+        :param _request: Ignored request object.
+        :param timeout: Request timeout.
+        :return: Synthetic response.
+        """
         assert timeout == 30
         return _Response(payload)
 
@@ -132,9 +166,19 @@ def test_download_rejects_invalid_responses(monkeypatch: pytest.MonkeyPatch, pay
 
 
 def test_download_handles_network_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Network failures are wrapped in the research error type."""
+    """Network failures are wrapped in the research error type.
+
+    :param monkeypatch: Pytest monkeypatch fixture.
+    """
 
     def failing_urlopen(_request: object, *, timeout: int) -> _Response:
+        """Raise a synthetic network failure.
+
+        :param _request: Ignored request object.
+        :param timeout: Request timeout used in the error message.
+        :return: Never returns because the stub always raises.
+        :raises urllib.error.URLError: Always raised by the stub.
+        """
         raise urllib.error.URLError(f"timeout after {timeout}")
 
     monkeypatch.setattr(research.urllib.request, "urlopen", failing_urlopen)
@@ -144,10 +188,19 @@ def test_download_handles_network_error(monkeypatch: pytest.MonkeyPatch) -> None
 
 
 def test_download_returns_valid_payload(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Valid JSON object bytes are returned without semantic rewriting."""
+    """Valid JSON object bytes are returned without semantic rewriting.
+
+    :param monkeypatch: Pytest monkeypatch fixture.
+    """
     payload = json.dumps(_schedule(_programme())).encode()
 
     def fake_urlopen(_request: object, *, timeout: int) -> _Response:
+        """Return the requested synthetic payload.
+
+        :param _request: Ignored request object.
+        :param timeout: Request timeout.
+        :return: Synthetic response.
+        """
         return _Response(payload)
 
     monkeypatch.setattr(research.urllib.request, "urlopen", fake_urlopen)
@@ -158,11 +211,23 @@ def test_download_returns_valid_payload(monkeypatch: pytest.MonkeyPatch) -> None
 def test_collect_writes_sequential_fixtures(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Collection waits between requests and atomically stores returned bytes."""
+    """Collection waits between requests and atomically stores returned bytes.
+
+    :param tmp_path: Temporary directory supplied by pytest.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    :param capsys: Pytest output capture fixture.
+    """
     payload = json.dumps(_schedule(_programme())).encode()
     delays: list[float] = []
 
     def fake_download(_username: str, _channel: str, _requested_date: date) -> bytes:
+        """Return the synthetic schedule payload.
+
+        :param _username: Ignored export username.
+        :param _channel: Ignored channel.
+        :param _requested_date: Ignored broadcast date.
+        :return: Synthetic response bytes.
+        """
         return payload
 
     monkeypatch.setattr(research, "_download", fake_download)
@@ -182,13 +247,28 @@ def test_collect_writes_sequential_fixtures(
 
 
 def test_collect_stops_at_empty_schedule(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Horizon collection stops as soon as the export has no programmes."""
+    """Horizon collection stops as soon as the export has no programmes.
+
+    :param tmp_path: Temporary directory supplied by pytest.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    """
     payload = b'{"error":"not found"}'
 
     def fake_download(_username: str, _channel: str, _requested_date: date) -> bytes:
+        """Return the synthetic empty-schedule response.
+
+        :param _username: Ignored export username.
+        :param _channel: Ignored channel.
+        :param _requested_date: Ignored broadcast date.
+        :return: Synthetic response bytes.
+        """
         return payload
 
     def skip_sleep(_delay: float) -> None:
+        """Skip the collection delay in the test.
+
+        :param _delay: Ignored delay value.
+        """
         return None
 
     monkeypatch.setattr(research, "_download", fake_download)
@@ -225,7 +305,10 @@ def test_object_and_programme_validation() -> None:
 
 
 def test_load_fixture_success_and_errors(tmp_path: Path) -> None:
-    """Fixture loading reports filesystem and JSON failures with path context."""
+    """Fixture loading reports filesystem and JSON failures with path context.
+
+    :param tmp_path: Temporary directory supplied by pytest.
+    """
     valid = tmp_path / "valid.json"
     valid.write_text(json.dumps(_schedule(_programme())), encoding="utf-8")
 
@@ -269,13 +352,20 @@ def test_walk_value_types_and_formatting_helpers() -> None:
     ],
 )
 def test_timing_validation_errors(programme: dict[str, object], message: str) -> None:
-    """Missing or malformed required timing fields fail clearly."""
+    """Missing or malformed required timing fields fail clearly.
+
+    :param programme: Synthetic programme payload.
+    :param message: Expected error message fragment.
+    """
     with pytest.raises(research.ResearchError, match=message):
         research.calculate_timings([programme])
 
 
 def test_build_report_covers_structure_timing_and_empty_fixture(tmp_path: Path) -> None:
-    """The report includes observed differences, timings, links, and MD013 guards."""
+    """The report includes observed differences, timings, links, and MD013 guards.
+
+    :param tmp_path: Temporary directory supplied by pytest.
+    """
     first = _programme()
     second = _programme(clock="10:30", sound={})
     schedule = _schedule(first, second)
@@ -293,7 +383,10 @@ def test_build_report_covers_structure_timing_and_empty_fixture(tmp_path: Path) 
 
 
 def test_build_report_without_programmes(tmp_path: Path) -> None:
-    """An entirely empty fixture still produces a useful deterministic report."""
+    """An entirely empty fixture still produces a useful deterministic report.
+
+    :param tmp_path: Temporary directory supplied by pytest.
+    """
     fixture = research.Fixture(tmp_path / "ct1.json", {}, {}, [])
 
     report = research.build_report([fixture])
@@ -303,7 +396,10 @@ def test_build_report_without_programmes(tmp_path: Path) -> None:
 
 
 def test_argument_and_path_helpers(tmp_path: Path) -> None:
-    """Date, request-list, and fixture-path helpers validate and sort inputs."""
+    """Date, request-list, and fixture-path helpers validate and sort inputs.
+
+    :param tmp_path: Temporary directory supplied by pytest.
+    """
     requested_date = date(2026, 9, 2)
     assert research._parse_date("2026-09-02") == requested_date
     with pytest.raises(argparse.ArgumentTypeError, match="Invalid ISO date"):
@@ -323,7 +419,11 @@ def test_argument_and_path_helpers(tmp_path: Path) -> None:
 
 
 def test_missing_export_username(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """A missing CT_USER produces a non-sensitive configuration error."""
+    """A missing CT_USER produces a non-sensitive configuration error.
+
+    :param tmp_path: Temporary directory supplied by pytest.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    """
     monkeypatch.delenv(research.EXPORT_USER_ENV, raising=False)
     with pytest.raises(research.ResearchError, match="Set CT_USER"):
         research.load_export_username(tmp_path / "missing.env")
@@ -331,10 +431,20 @@ def test_missing_export_username(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 
 @pytest.mark.parametrize("command", ["collect", "fetch", "probe-horizon"])
 def test_main_download_commands(command: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Every download CLI branch passes resolved arguments to collection."""
+    """Every download CLI branch passes resolved arguments to collection.
+
+    :param command: CLI command under test.
+    :param tmp_path: Temporary directory supplied by pytest.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    """
     calls: list[dict[str, object]] = []
 
     def fake_collect(**kwargs: object) -> list[Path]:
+        """Record synthetic collection arguments.
+
+        :param **kwargs: Collection arguments.
+        :return: Empty list of written paths.
+        """
         calls.append(kwargs)
         return []
 
@@ -352,7 +462,11 @@ def test_main_download_commands(command: str, tmp_path: Path, monkeypatch: pytes
 
 
 def test_main_analyse_output_and_stdout(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """Analysis CLI can write a report file or emit it to stdout."""
+    """Analysis CLI can write a report file or emit it to stdout.
+
+    :param tmp_path: Temporary directory supplied by pytest.
+    :param capsys: Pytest output capture fixture.
+    """
     fixture = tmp_path / "fixture.json"
     fixture.write_text(json.dumps(_schedule(_programme())), encoding="utf-8")
     output = tmp_path / "nested" / "report.md"
@@ -366,9 +480,19 @@ def test_main_analyse_output_and_stdout(tmp_path: Path, capsys: pytest.CaptureFi
 def test_main_reports_expected_errors(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Expected runtime errors return status one without a traceback."""
+    """Expected runtime errors return status one without a traceback.
+
+    :param tmp_path: Temporary directory supplied by pytest.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    :param capsys: Pytest output capture fixture.
+    """
 
     def no_fixture_paths(_paths: Sequence[Path]) -> list[Path]:
+        """Return no paths for the error-path test.
+
+        :param _paths: Ignored input paths.
+        :return: Empty path list.
+        """
         return []
 
     monkeypatch.setattr(research, "_fixture_paths", no_fixture_paths)

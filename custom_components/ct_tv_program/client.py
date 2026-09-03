@@ -42,7 +42,7 @@ class CzechTelevisionClient:
         self._username = username.strip()
         self._timeout = aiohttp.ClientTimeout(total=request_timeout)
 
-    async def async_fetch_schedule(self, channel: str, broadcast_date: date) -> Schedule:
+    async def async_fetch_schedule(self, channel: str, broadcast_date: date) -> Schedule:  # noqa: DOC503
         """Fetch one broadcasting-day schedule and return normalized typed data.
 
         :param channel: Czech Television export channel identifier.

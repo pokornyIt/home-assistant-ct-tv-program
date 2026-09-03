@@ -21,6 +21,13 @@ repos:
     hooks:
       - id: pyright
 
+  - repo: https://github.com/jsh9/pydoclint
+    rev: 0.9.1
+    hooks:
+      - id: pydoclint
+        args: ["--config=pyproject.toml"]
+        exclude: ^tests/
+
   - repo: local
     hooks:
       - id: pytest
