@@ -17,6 +17,13 @@ _EPISODE_PATTERN: Final = re.compile(r"^(?P<episode>\d+)\s*/\s*(?P<count>\d+)$")
 
 
 def _mapping(value: object, *, path: str) -> Mapping[str, object]:
+    """Validate and return an object with string keys.
+
+    :param value: Source value expected to contain an object.
+    :param path: Diagnostic path of the source value.
+    :return: Validated source mapping.
+    :raises CtTvProgramParseError: If the value is not an object with string keys.
+    """
     if not isinstance(value, Mapping):
         raise CtTvProgramParseError(f"Expected an object at {path}")
     raw_mapping = cast("Mapping[object, object]", value)
@@ -26,6 +33,14 @@ def _mapping(value: object, *, path: str) -> Mapping[str, object]:
 
 
 def _group(parent: Mapping[str, object], key: str, *, path: str) -> Mapping[str, object]:
+    """Return an optional nested object using an empty mapping as the default.
+
+    :param parent: Source mapping containing the optional group.
+    :param key: Name of the nested group.
+    :param path: Diagnostic path of the parent mapping.
+    :return: Validated nested mapping or an empty mapping.
+    :raises CtTvProgramParseError: If a present group is not an object with string keys.
+    """
     value = parent.get(key)
     if value is None or value == {}:
         return {}
@@ -33,6 +48,11 @@ def _group(parent: Mapping[str, object], key: str, *, path: str) -> Mapping[str,
 
 
 def _optional_text(value: object) -> str | None:
+    """Normalize an optional source scalar to text.
+
+    :param value: Optional scalar value from the source payload.
+    :return: Normalized text or ``None`` for an empty or unsupported value.
+    """
     if value is None or value == {}:
         return None
     if isinstance(value, str):
@@ -44,12 +64,26 @@ def _optional_text(value: object) -> str | None:
 
 
 def _required_text(value: object, *, path: str) -> str:
+    """Validate and normalize a required text value.
+
+    :param value: Required source value.
+    :param path: Diagnostic path of the source value.
+    :return: Stripped non-empty text.
+    :raises CtTvProgramParseError: If the value is not non-empty text.
+    """
     if not isinstance(value, str) or not value.strip():
         raise CtTvProgramParseError(f"Missing or invalid required text at {path}")
     return value.strip()
 
 
 def _flag(value: object, *, path: str) -> bool:
+    """Normalize an optional zero-or-one status flag.
+
+    :param value: Source status value.
+    :param path: Diagnostic path of the source value.
+    :return: Explicit boolean status.
+    :raises CtTvProgramParseError: If a non-empty value is neither ``"0"`` nor ``"1"``.
+    """
     if value is None or value in ({}, ""):
         return False
     if value == "0":
@@ -60,6 +94,13 @@ def _flag(value: object, *, path: str) -> bool:
 
 
 def _start(programme: Mapping[str, object], *, path: str) -> datetime:
+    """Parse the timezone-aware start of a programme.
+
+    :param programme: Source programme mapping.
+    :param path: Diagnostic path of the programme.
+    :return: Start time in the Europe/Prague timezone.
+    :raises CtTvProgramParseError: If the date or time is missing or malformed.
+    """
     raw_date = _required_text(programme.get("datum"), path=f"{path}.datum")
     raw_time = _required_text(programme.get("cas"), path=f"{path}.cas")
     try:
@@ -73,6 +114,13 @@ def _start(programme: Mapping[str, object], *, path: str) -> datetime:
 
 
 def _duration(value: object, *, path: str) -> timedelta:
+    """Parse the source programme duration.
+
+    :param value: Source duration in ``mmm:ss`` form.
+    :param path: Diagnostic path of the source value.
+    :return: Parsed source duration.
+    :raises CtTvProgramParseError: If the duration is missing or malformed.
+    """
     raw_duration = _required_text(value, path=path)
     match = _DURATION_PATTERN.fullmatch(raw_duration)
     if match is None:
@@ -81,6 +129,11 @@ def _duration(value: object, *, path: str) -> timedelta:
 
 
 def _episode(value: object) -> tuple[int | None, int | None]:
+    """Parse optional episode and episode-count metadata.
+
+    :param value: Source episode value in ``episode/count`` form.
+    :return: Episode and episode count, or two ``None`` values when unavailable or malformed.
+    """
     raw_episode = _optional_text(value)
     if raw_episode is None:
         return None, None
@@ -91,6 +144,12 @@ def _episode(value: object) -> tuple[int | None, int | None]:
 
 
 def _generated_at(value: object) -> datetime | None:
+    """Parse an optional schedule generation timestamp.
+
+    :param value: Source schedule generation timestamp.
+    :return: Generation time in the Europe/Prague timezone, or ``None`` when absent.
+    :raises CtTvProgramParseError: If a present timestamp is malformed.
+    """
     raw_generated_at = _optional_text(value)
     if raw_generated_at is None:
         return None
@@ -103,7 +162,13 @@ def _generated_at(value: object) -> datetime | None:
 
 
 def parse_programme(value: object, *, index: int = 0) -> Programme:
-    """Parse one raw programme object into an immutable model."""
+    """Parse one raw programme object into an immutable model.
+
+    :param value: Raw programme object from the export payload.
+    :param index: Programme index used in diagnostic paths.
+    :return: Normalized immutable programme.
+    :raises CtTvProgramParseError: If required data or a source status flag is malformed.
+    """
     path = f"program.porad[{index}]"
     programme = _mapping(value, path=path)
     names = _group(programme, "nazvy", path=path)
@@ -142,6 +207,12 @@ def parse_programme(value: object, *, index: int = 0) -> Programme:
 
 
 def _programmes(schedule: Mapping[str, object]) -> tuple[Programme, ...]:
+    """Parse all programme entries from a schedule object.
+
+    :param schedule: Raw schedule mapping.
+    :return: Normalized immutable programme collection.
+    :raises CtTvProgramParseError: If the programme container or an entry is malformed.
+    """
     value = schedule.get("porad")
     if value is None or value == {}:
         return ()
@@ -154,7 +225,13 @@ def _programmes(schedule: Mapping[str, object]) -> tuple[Programme, ...]:
 
 
 def parse_schedule(value: object) -> Schedule:
-    """Parse a successful export payload or raise a typed boundary error."""
+    """Parse a successful export payload or raise a typed boundary error.
+
+    :param value: Decoded JSON value returned by the official export.
+    :return: Normalized immutable broadcasting-day schedule.
+    :raises CtTvProgramScheduleNotAvailableError: If the export reports an unavailable schedule.
+    :raises CtTvProgramParseError: If the successful response has malformed structure or values.
+    """
     root = _mapping(value, path="root")
     error = _optional_text(root.get("error"))
     if error is not None:

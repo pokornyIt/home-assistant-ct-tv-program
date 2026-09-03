@@ -23,6 +23,7 @@ from custom_components.ct_tv_program.client import EXPORT_URL, USER_AGENT
 
 
 def _payload() -> dict[str, object]:
+    """Build a minimal synthetic schedule payload."""
     return {
         "program": {
             "@attributes": {"datum_vysilani": "2026-09-03", "kanal": "ct1"},
@@ -40,18 +41,22 @@ def _payload() -> dict[str, object]:
 
 class _Response:
     def __init__(self, body: str, *, status: int = 200) -> None:
+        """Initialize a synthetic HTTP response."""
         self.status = status
         self._body = body
 
     async def text(self) -> str:
+        """Return the synthetic response body."""
         return self._body
 
 
 class _RequestContext:
     def __init__(self, response: _Response) -> None:
+        """Initialize a synthetic request context."""
         self._response = response
 
     async def __aenter__(self) -> _Response:
+        """Enter the synthetic request context."""
         return self._response
 
     async def __aexit__(
@@ -60,11 +65,13 @@ class _RequestContext:
         exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
+        """Exit the synthetic request context."""
         return None
 
 
 class _Session:
     def __init__(self, response: _Response | BaseException) -> None:
+        """Initialize a synthetic HTTP session."""
         self._response = response
         self.request: tuple[str, dict[str, str], dict[str, str], aiohttp.ClientTimeout] | None = None
 
@@ -76,6 +83,7 @@ class _Session:
         headers: dict[str, str],
         timeout: aiohttp.ClientTimeout,
     ) -> _RequestContext:
+        """Capture a synthetic HTTP request."""
         self.request = (url, params, headers, timeout)
         if isinstance(self._response, BaseException):
             raise self._response
@@ -83,6 +91,7 @@ class _Session:
 
 
 def _client(session: _Session, **kwargs: float) -> CzechTelevisionClient:
+    """Build a client with a synthetic HTTP session."""
     return CzechTelevisionClient(cast("aiohttp.ClientSession", session), "export-user", **kwargs)
 
 

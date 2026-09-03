@@ -15,7 +15,10 @@ class CtTvProgramHttpError(CtTvProgramError):
     """Represent an unsuccessful HTTP response from the export."""
 
     def __init__(self, status: int) -> None:
-        """Initialize the error without exposing request configuration."""
+        """Initialize the error without exposing request configuration.
+
+        :param status: HTTP response status returned by the export.
+        """
         self.status = status
         super().__init__(f"Czech Television export returned HTTP status {status}")
 

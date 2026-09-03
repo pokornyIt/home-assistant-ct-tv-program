@@ -19,6 +19,7 @@ from custom_components.ct_tv_program.parser import PRAGUE_TIME_ZONE
 
 
 def _programme(**overrides: object) -> dict[str, object]:
+    """Build a complete synthetic programme payload."""
     programme: dict[str, object] = {
         "linky": {
             "program": "https://example.test/programme",
@@ -59,6 +60,7 @@ def _programme(**overrides: object) -> dict[str, object]:
 
 
 def _schedule(*programmes: object, wrapped: bool = True) -> dict[str, object]:
+    """Build a synthetic broadcasting-day schedule payload."""
     schedule: dict[str, object] = {
         "@attributes": {
             "datum_vysilani": "2026-09-03",
