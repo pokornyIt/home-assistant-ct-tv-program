@@ -39,7 +39,6 @@ def _group(parent: Mapping[str, object], key: str, *, path: str) -> Mapping[str,
     :param key: Name of the nested group.
     :param path: Diagnostic path of the parent mapping.
     :return: Validated nested mapping or an empty mapping.
-    :raises CtTvProgramParseError: If a present group is not an object with string keys.
     """
     value = parent.get(key)
     if value is None or value == {}:
@@ -167,7 +166,6 @@ def parse_programme(value: object, *, index: int = 0) -> Programme:
     :param value: Raw programme object from the export payload.
     :param index: Programme index used in diagnostic paths.
     :return: Normalized immutable programme.
-    :raises CtTvProgramParseError: If required data or a source status flag is malformed.
     """
     path = f"program.porad[{index}]"
     programme = _mapping(value, path=path)

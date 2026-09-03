@@ -72,7 +72,11 @@ class TimingRow:
 
 
 def _text(value: object) -> str | None:
-    """Normalize an optional scalar source value to text."""
+    """Normalize an optional scalar source value to text.
+
+    :param value: Source value to normalize.
+    :return: Stripped text or ``None`` for an empty or unsupported value.
+    """
     if value is None or value in ({}, ""):
         return None
     if isinstance(value, (str, int, float)) and not isinstance(value, bool):
@@ -81,10 +85,22 @@ def _text(value: object) -> str | None:
 
 
 def _format_export_date(value: date) -> str:
+    """Format a date for the Czech Television export.
+
+    :param value: Date to format.
+    :return: Export-formatted date.
+    """
     return value.strftime("%d.%m.%Y")
 
 
 def _request_url(username: str, channel: str, broadcast_date: date) -> str:
+    """Build an official export URL for one channel and date.
+
+    :param username: Registered export username.
+    :param channel: Channel identifier.
+    :param broadcast_date: Date to request.
+    :return: URL with encoded export parameters.
+    """
     query = urllib.parse.urlencode(
         {
             "user": username,
@@ -97,6 +113,14 @@ def _request_url(username: str, channel: str, broadcast_date: date) -> str:
 
 
 def _download(username: str, channel: str, broadcast_date: date) -> bytes:
+    """Download and validate one raw export response.
+
+    :param username: Registered export username.
+    :param channel: Channel identifier.
+    :param broadcast_date: Date to request.
+    :return: Raw validated JSON response bytes.
+    :raises ResearchError: If the request or response is invalid.
+    """
     request = urllib.request.Request(
         _request_url(username, channel, broadcast_date),
         headers={"Accept": "application/json", "User-Agent": USER_AGENT},
@@ -120,6 +144,11 @@ def _download(username: str, channel: str, broadcast_date: date) -> bytes:
 
 
 def _write_payload(payload: bytes, target: Path) -> None:
+    """Write raw response bytes atomically to a local path.
+
+    :param payload: Raw response bytes.
+    :param target: Destination path.
+    """
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary = target.with_suffix(f"{target.suffix}.tmp")
     temporary.write_bytes(payload)
@@ -134,7 +163,16 @@ def collect_fixtures(
     delay_seconds: float,
     stop_on_empty: bool = False,
 ) -> list[Path]:
-    """Download schedule requests sequentially with an enforced safe delay."""
+    """Download schedule requests sequentially with an enforced safe delay.
+
+    :param username: Registered Czech Television export username.
+    :param requests: Ordered channel and date requests.
+    :param output_dir: Local directory for ignored raw JSON files.
+    :param delay_seconds: Delay between sequential requests.
+    :param stop_on_empty: Whether to stop after an empty schedule response.
+    :return: Paths of downloaded raw fixture files.
+    :raises ResearchError: If a request fails or the response cannot be written.
+    """
     if delay_seconds < MIN_REQUEST_DELAY_SECONDS:
         msg = f"Request delay must be at least {MIN_REQUEST_DELAY_SECONDS:.0f} seconds"
         raise ResearchError(msg)
@@ -164,6 +202,13 @@ def collect_fixtures(
 
 
 def _as_object(value: object, *, context: str) -> JsonObject:
+    """Validate an object-shaped JSON value.
+
+    :param value: Value expected to be a JSON object.
+    :param context: Context used in error messages.
+    :return: Validated JSON object.
+    :raises ResearchError: If the value is not an object with string keys.
+    """
     if not isinstance(value, dict):
         msg = f"Expected an object at {context}"
         raise ResearchError(msg)
@@ -175,11 +220,22 @@ def _as_object(value: object, *, context: str) -> JsonObject:
 
 
 def _extract_schedule(root: JsonObject) -> JsonObject:
+    """Extract the schedule object from an export root.
+
+    :param root: Export JSON root object.
+    :return: Extracted schedule object.
+    """
     candidate = root.get("program", root)
     return _as_object(candidate, context="program")
 
 
 def _extract_programmes(schedule: JsonObject) -> list[JsonObject]:
+    """Extract programme objects from a schedule.
+
+    :param schedule: Schedule JSON object.
+    :return: Validated programme objects.
+    :raises ResearchError: If the programme container is malformed.
+    """
     raw = schedule.get("porad", [])
     if raw == {} or raw is None:
         return []
@@ -192,7 +248,12 @@ def _extract_programmes(schedule: JsonObject) -> list[JsonObject]:
 
 
 def load_fixture(path: Path) -> Fixture:
-    """Load and validate one JSON schedule fixture."""
+    """Load and validate one JSON schedule fixture.
+
+    :param path: Path to the local raw JSON fixture.
+    :return: Parsed fixture metadata and programme entries.
+    :raises ResearchError: If the file is invalid or has an unsupported structure.
+    """
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as err:
@@ -204,6 +265,12 @@ def load_fixture(path: Path) -> Fixture:
 
 
 def _walk(value: object, prefix: str = "") -> Iterable[tuple[str, object]]:
+    """Walk nested JSON values and yield their leaf paths.
+
+    :param value: JSON value to traverse.
+    :param prefix: Path prefix for the current value.
+    :yields: Leaf paths and their values.
+    """
     if isinstance(value, dict):
         mapping = cast("dict[object, object]", value)
         if not mapping:
@@ -222,6 +289,11 @@ def _walk(value: object, prefix: str = "") -> Iterable[tuple[str, object]]:
 
 
 def _value_type(value: object) -> str:
+    """Return the normalized type label used in reports.
+
+    :param value: Value to classify.
+    :return: Normalized type label.
+    """
     if value == {}:
         return "empty object"
     if value is None:
@@ -230,6 +302,12 @@ def _value_type(value: object) -> str:
 
 
 def _parse_start(programme: Mapping[str, object]) -> datetime:
+    """Parse a programme start in the Prague timezone.
+
+    :param programme: Raw programme mapping.
+    :return: Timezone-aware programme start.
+    :raises ResearchError: If the date or time is missing or malformed.
+    """
     day = _text(programme.get("datum"))
     clock = _text(programme.get("cas"))
     if day is None or clock is None:
@@ -243,6 +321,12 @@ def _parse_start(programme: Mapping[str, object]) -> datetime:
 
 
 def _parse_duration(value: object) -> timedelta:
+    """Parse a source duration into a timedelta.
+
+    :param value: Source duration value.
+    :return: Parsed duration.
+    :raises ResearchError: If the duration is missing or malformed.
+    """
     duration = _text(value)
     if duration is None:
         message = "Programme is missing stopaz"
@@ -256,7 +340,11 @@ def _parse_duration(value: object) -> timedelta:
 
 
 def calculate_timings(programmes: Sequence[Mapping[str, object]]) -> list[TimingRow]:
-    """Calculate content and effective end times for ordered programmes."""
+    """Calculate content and effective end times for ordered programmes.
+
+    :param programmes: Ordered raw programme entries.
+    :return: Derived timing rows.
+    """
     starts = [_parse_start(programme) for programme in programmes]
     rows: list[TimingRow] = []
     for index, (programme, start) in enumerate(zip(programmes, starts, strict=True)):
@@ -268,10 +356,20 @@ def calculate_timings(programmes: Sequence[Mapping[str, object]]) -> list[Timing
 
 
 def _programme_paths(programme: JsonObject) -> set[str]:
+    """Return all observed paths in a programme object.
+
+    :param programme: Programme JSON object.
+    :return: Set of observed paths.
+    """
     return {path for path, _ in _walk(programme)}
 
 
 def _extension(value: object) -> str | None:
+    """Extract a lowercase file extension from an optional URL.
+
+    :param value: Optional URL value.
+    :return: Lowercase extension or ``None``.
+    """
     text = _text(value)
     if text is None:
         return None
@@ -280,6 +378,13 @@ def _extension(value: object) -> str | None:
 
 
 def _nested(programme: Mapping[str, object], group: str, field: str) -> object:
+    """Read one field from an optional nested source group.
+
+    :param programme: Raw programme mapping.
+    :param group: Nested group name.
+    :param field: Field name within the group.
+    :return: Nested field value or ``None``.
+    """
     parent = programme.get(group)
     if not isinstance(parent, dict):
         return None
@@ -287,12 +392,21 @@ def _nested(programme: Mapping[str, object], group: str, field: str) -> object:
 
 
 def _format_values(values: Iterable[object]) -> str:
+    """Render sorted JSON values for a Markdown report.
+
+    :param values: Values to render.
+    :return: Sorted inline Markdown representation.
+    """
     rendered = sorted({json.dumps(value, ensure_ascii=False, sort_keys=True) for value in values})
     return ", ".join(f"`{value}`" for value in rendered) or "none"
 
 
 def build_report(fixtures: Sequence[Fixture]) -> str:
-    """Build a deterministic Markdown analysis for schedule fixtures."""
+    """Build a deterministic Markdown analysis for schedule fixtures.
+
+    :param fixtures: Parsed local research fixtures.
+    :return: Markdown report containing derived statistics.
+    """
     all_programmes = [programme for fixture in fixtures for programme in fixture.programmes]
     entry_paths: dict[str, set[str]] = {}
     field_types: dict[str, Counter[str]] = defaultdict(Counter)
@@ -473,6 +587,12 @@ def build_report(fixtures: Sequence[Fixture]) -> str:
 
 
 def _parse_date(value: str) -> date:
+    """Parse a command-line ISO date.
+
+    :param value: ISO date text.
+    :return: Parsed date.
+    :raises argparse.ArgumentTypeError: If the value is not an ISO date.
+    """
     try:
         return date.fromisoformat(value)
     except ValueError as err:
@@ -481,7 +601,12 @@ def _parse_date(value: str) -> date:
 
 
 def load_export_username(dotenv_path: Path = Path(".env")) -> str:
-    """Load the registered export username from the project environment file."""
+    """Load the registered export username from the project environment file.
+
+    :param dotenv_path: Dotenv file path.
+    :return: Configured export username.
+    :raises ResearchError: If the username is missing or empty.
+    """
     load_dotenv(dotenv_path=dotenv_path, override=False)
     username = os.environ.get(EXPORT_USER_ENV)
     if not username:
@@ -491,6 +616,11 @@ def load_export_username(dotenv_path: Path = Path(".env")) -> str:
 
 
 def _sample_requests(broadcast_date: date) -> list[tuple[str, date]]:
+    """Build the default research request set.
+
+    :param broadcast_date: Base date for requests.
+    :return: Default channel and date requests.
+    """
     return [
         ("ct1", broadcast_date),
         ("ct1", broadcast_date + timedelta(days=1)),
@@ -499,6 +629,13 @@ def _sample_requests(broadcast_date: date) -> list[tuple[str, date]]:
 
 
 def _horizon_requests(broadcast_date: date, offsets: Sequence[int]) -> list[tuple[str, date]]:
+    """Build deduplicated future horizon requests.
+
+    :param broadcast_date: Base date for requests.
+    :param offsets: Future offsets in whole days.
+    :return: Sorted unique channel and date requests.
+    :raises ResearchError: If an offset is not positive.
+    """
     if any(offset < 1 for offset in offsets):
         message = "Horizon offsets must be positive whole days"
         raise ResearchError(message)
@@ -506,6 +643,11 @@ def _horizon_requests(broadcast_date: date, offsets: Sequence[int]) -> list[tupl
 
 
 def _fixture_paths(paths: Sequence[Path]) -> list[Path]:
+    """Resolve and sort JSON fixture paths from files and directories.
+
+    :param paths: Input files and directories.
+    :return: Sorted unique JSON paths.
+    """
     result: list[Path] = []
     for path in paths:
         if path.is_dir():
@@ -516,6 +658,10 @@ def _fixture_paths(paths: Sequence[Path]) -> list[Path]:
 
 
 def _build_parser() -> argparse.ArgumentParser:
+    """Build the research command-line argument parser.
+
+    :return: Configured argument parser.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -552,7 +698,12 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run the command-line research tool."""
+    """Run the command-line research tool.
+
+    :param argv: Optional command-line arguments without the executable name.
+    :return: Process exit status.
+    :raises ResearchError: If the requested research operation fails.
+    """
     args = _build_parser().parse_args(argv)
     try:
         if args.command == "collect":

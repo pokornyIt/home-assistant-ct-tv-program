@@ -23,7 +23,10 @@ from custom_components.ct_tv_program.client import EXPORT_URL, USER_AGENT
 
 
 def _payload() -> dict[str, object]:
-    """Build a minimal synthetic schedule payload."""
+    """Build a minimal synthetic schedule payload.
+
+    :return: Synthetic schedule payload.
+    """
     return {
         "program": {
             "@attributes": {"datum_vysilani": "2026-09-03", "kanal": "ct1"},
@@ -40,23 +43,40 @@ def _payload() -> dict[str, object]:
 
 
 class _Response:
+    """Represent a synthetic HTTP response."""
+
     def __init__(self, body: str, *, status: int = 200) -> None:
-        """Initialize a synthetic HTTP response."""
+        """Initialize a synthetic HTTP response.
+
+        :param body: Synthetic response body.
+        :param status: Synthetic HTTP status.
+        """
         self.status = status
         self._body = body
 
     async def text(self) -> str:
-        """Return the synthetic response body."""
+        """Return the synthetic response body.
+
+        :return: Synthetic response body.
+        """
         return self._body
 
 
 class _RequestContext:
+    """Represent a synthetic asynchronous request context."""
+
     def __init__(self, response: _Response) -> None:
-        """Initialize a synthetic request context."""
+        """Initialize a synthetic request context.
+
+        :param response: Synthetic response returned by the context.
+        """
         self._response = response
 
     async def __aenter__(self) -> _Response:
-        """Enter the synthetic request context."""
+        """Enter the synthetic request context.
+
+        :return: Synthetic response.
+        """
         return self._response
 
     async def __aexit__(
@@ -65,17 +85,27 @@ class _RequestContext:
         exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
-        """Exit the synthetic request context."""
+        """Exit the synthetic request context.
+
+        :param exc_type: Exception type raised in the context, if any.
+        :param exc_value: Exception raised in the context, if any.
+        :param traceback: Exception traceback, if any.
+        """
         return None
 
 
 class _Session:
+    """Represent a synthetic asynchronous HTTP session."""
+
     def __init__(self, response: _Response | BaseException) -> None:
-        """Initialize a synthetic HTTP session."""
+        """Initialize a synthetic HTTP session.
+
+        :param response: Synthetic response or transport exception.
+        """
         self._response = response
         self.request: tuple[str, dict[str, str], dict[str, str], aiohttp.ClientTimeout] | None = None
 
-    def get(
+    def get(  # noqa: DOC503
         self,
         url: str,
         *,
@@ -83,7 +113,15 @@ class _Session:
         headers: dict[str, str],
         timeout: aiohttp.ClientTimeout,
     ) -> _RequestContext:
-        """Capture a synthetic HTTP request."""
+        """Capture a synthetic HTTP request.
+
+        :param url: Requested URL.
+        :param params: Query parameters.
+        :param headers: Request headers.
+        :param timeout: Request timeout.
+        :return: Synthetic request context.
+        :raises BaseException: If the configured response is an exception.
+        """
         self.request = (url, params, headers, timeout)
         if isinstance(self._response, BaseException):
             raise self._response
@@ -91,7 +129,12 @@ class _Session:
 
 
 def _client(session: _Session, **kwargs: float) -> CzechTelevisionClient:
-    """Build a client with a synthetic HTTP session."""
+    """Build a client with a synthetic HTTP session.
+
+    :param session: Synthetic HTTP session.
+    :param **kwargs: Optional client configuration overrides.
+    :return: Configured Czech Television client.
+    """
     return CzechTelevisionClient(cast("aiohttp.ClientSession", session), "export-user", **kwargs)
 
 
@@ -123,7 +166,10 @@ def test_client_uses_configurable_explicit_timeout() -> None:
 
 @pytest.mark.parametrize("error", [aiohttp.ClientConnectionError("offline"), TimeoutError("timeout")])
 def test_client_wraps_network_failures(error: BaseException) -> None:
-    """Transport failures have a stable error independent of aiohttp details."""
+    """Transport failures have a stable error independent of aiohttp details.
+
+    :param error: Synthetic transport failure.
+    """
     with pytest.raises(CtTvProgramNetworkError, match="Failed to request"):
         asyncio.run(_client(_Session(error)).async_fetch_schedule("ct1", date(2026, 9, 3)))
 
