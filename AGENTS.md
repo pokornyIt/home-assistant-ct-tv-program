@@ -228,6 +228,20 @@ dedicated Home Assistant entity.
 
 Research tooling must remain clearly separated from production integration code.
 
+When available, local raw Czech Television research responses conventionally live
+under `fixtures/`. The repository intentionally ignores `fixtures/**/*.json` because
+raw programme exports must never be committed, published, redistributed, attached to
+issues or pull requests, included in CI artifacts, snapshots, logs, documentation, or
+releases. Agents may inspect these local files when useful for understanding the real
+source structure, ordering, timing, and edge cases.
+
+These local raw files are research/reference input only; they are not repository test
+fixtures in the publishable sense. Tests must use separately constructed synthetic
+data derived from documented structure and observed behaviour, never copies or
+mechanically reduced extracts of raw schedules that reproduce machine-readable
+programme data. The implementation must not fail when the local `fixtures/` directory
+or particular raw files are absent, and no production code may depend on it.
+
 Scripts used to inspect Czech Television data may live under:
 
 ```text
