@@ -84,7 +84,11 @@ def merge_schedules(*schedules: Schedule) -> Schedule:
             raise ValueError(f"Cannot merge schedules for different channels: {channel!r} and {schedule.channel!r}")
 
     broadcast_date = min(s.broadcast_date for s in schedules)
-    generated_at = max((s.generated_at for s in schedules if s.generated_at is not None), default=None)
+    generated_at = max(
+        (s.generated_at for s in schedules if s.generated_at is not None),
+        key=lambda dt: dt.astimezone(UTC),
+        default=None,
+    )
     merged_programmes = merge_programmes(*(s.programmes for s in schedules))
 
     return Schedule(
@@ -101,7 +105,8 @@ def get_current_and_next_programme(
 ) -> tuple[Programme | None, Programme | None]:
     """Determine the currently airing programme and the next scheduled programme.
 
-    A programme is considered currently airing if ``start <= now < effective_end``.
+    A programme is considered currently airing if ``start <= now < effective_end``
+    comparing actual UTC instants.
     If a programme has ``effective_end=None`` (the final programme in the known schedule),
     it is NOT claimed as currently airing once its start time has been reached. Instead,
     ``(None, None)`` is returned when ``now >= final_programme.start`` with no known end
@@ -115,10 +120,15 @@ def get_current_and_next_programme(
     if now.tzinfo is None or now.tzinfo.utcoffset(now) is None:
         raise ValueError("Timestamp 'now' must be timezone-aware")
 
-    for index, programme in enumerate(programmes):
-        if programme.effective_end is not None and programme.start <= now < programme.effective_end:
-            next_programme = programmes[index + 1] if index + 1 < len(programmes) else None
-            return programme, next_programme
+    now_utc = now.astimezone(UTC)
 
-    next_programme = next((p for p in programmes if p.start > now), None)
+    for index, programme in enumerate(programmes):
+        if programme.effective_end is not None:
+            p_start_utc = programme.start.astimezone(UTC)
+            p_end_utc = programme.effective_end.astimezone(UTC)
+            if p_start_utc <= now_utc < p_end_utc:
+                next_programme = programmes[index + 1] if index + 1 < len(programmes) else None
+                return programme, next_programme
+
+    next_programme = next((p for p in programmes if p.start.astimezone(UTC) > now_utc), None)
     return None, next_programme

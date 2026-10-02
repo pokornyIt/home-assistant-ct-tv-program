@@ -152,21 +152,174 @@ def test_deduplication_overwrites_identical_key_entries_with_later_version() -> 
     assert merged[0].description == "Final schedule description"
 
 
-def test_autumn_dst_fold_ordering() -> None:
-    """Programmes within the Europe/Prague autumn DST fold are ordered by actual UTC instant."""
+def test_autumn_dst_fold_ordering_and_current_next_lookup() -> None:
+    """Programmes within the Europe/Prague autumn DST fold are ordered and looked up by actual UTC instant."""
     fold0_time = datetime(2026, 10, 25, 2, 30, fold=0, tzinfo=PRAGUE_TIME_ZONE)
     fold1_time = datetime(2026, 10, 25, 2, 30, fold=1, tzinfo=PRAGUE_TIME_ZONE)
+    after_fold_time = datetime(2026, 10, 25, 3, 30, tzinfo=PRAGUE_TIME_ZONE)
 
-    p_first = _programme(title="CEST broadcast (02:30 fold=0)", start=fold0_time)
-    p_second = _programme(title="CET broadcast (02:30 fold=1)", start=fold1_time)
+    p_a = _programme(title="Show A", start=fold0_time, program_url="https://example.test/a")
+    p_b = _programme(title="Show B", start=fold1_time, program_url="https://example.test/b")
+    p_c = _programme(title="Show C", start=after_fold_time, program_url="https://example.test/c")
 
-    merged_out_of_order = merge_programmes([p_second, p_first])
+    merged = merge_programmes([p_b, p_c, p_a])
 
-    assert len(merged_out_of_order) == 2
-    assert merged_out_of_order[0].title == "CEST broadcast (02:30 fold=0)"
-    assert merged_out_of_order[1].title == "CET broadcast (02:30 fold=1)"
-    assert merged_out_of_order[0].effective_end == fold1_time
-    assert merged_out_of_order[1].effective_end is None
+    assert len(merged) == 3
+    assert merged[0].title == "Show A"
+    assert merged[1].title == "Show B"
+    assert merged[2].title == "Show C"
+    assert merged[0].effective_end == fold1_time
+    assert merged[1].effective_end == after_fold_time
+
+    # At 02:45 fold=0 (00:45 UTC): expected current = Show A, next = Show B
+    now_0245_fold0 = datetime(2026, 10, 25, 2, 45, fold=0, tzinfo=PRAGUE_TIME_ZONE)
+    curr, nxt = get_current_and_next_programme(merged, now_0245_fold0)
+    assert curr is not None and curr.title == "Show A"
+    assert nxt is not None and nxt.title == "Show B"
+
+    # At 02:15 fold=1 (01:15 UTC): expected current = Show A, next = Show B
+    now_0215_fold1 = datetime(2026, 10, 25, 2, 15, fold=1, tzinfo=PRAGUE_TIME_ZONE)
+    curr, nxt = get_current_and_next_programme(merged, now_0215_fold1)
+    assert curr is not None and curr.title == "Show A"
+    assert nxt is not None and nxt.title == "Show B"
+
+    # Exact boundary 02:30 fold=0 (00:30 UTC): returns Show A, next = Show B
+    curr_b0, nxt_b0 = get_current_and_next_programme(merged, fold0_time)
+    assert curr_b0 is not None and curr_b0.title == "Show A"
+    assert nxt_b0 is not None and nxt_b0.title == "Show B"
+
+    # Exact boundary 02:30 fold=1 (01:30 UTC): returns Show B, next = Show C
+    curr_b1, nxt_b1 = get_current_and_next_programme(merged, fold1_time)
+    assert curr_b1 is not None and curr_b1.title == "Show B"
+    assert nxt_b1 is not None and nxt_b1.title == "Show C"
+
+
+def test_autumn_dst_fold_generation_time_selection() -> None:
+    """Merging schedules selects the latest generated_at timestamp during autumn DST fold."""
+    fold0_gen = datetime(2026, 10, 25, 2, 30, fold=0, tzinfo=PRAGUE_TIME_ZONE)
+    fold1_gen = datetime(2026, 10, 25, 2, 30, fold=1, tzinfo=PRAGUE_TIME_ZONE)
+
+    s1 = _schedule(generated_at=fold0_gen)
+    s2 = _schedule(generated_at=fold1_gen)
+
+    merged = merge_schedules(s1, s2)
+    assert merged.generated_at == fold1_gen
+
+
+def test_spring_forward_dst_transitions() -> None:
+    """Schedule merging and lookup operate seamlessly across spring-forward DST jumps."""
+    start_cet = datetime(2026, 3, 29, 1, 30, tzinfo=PRAGUE_TIME_ZONE)
+    start_cest = datetime(2026, 3, 29, 3, 0, tzinfo=PRAGUE_TIME_ZONE)
+
+    p1 = _programme(title="Night show", start=start_cet)
+    p2 = _programme(title="Morning show", start=start_cest)
+
+    merged = merge_programmes([p1, p2])
+
+    assert merged[0].effective_end == start_cest
+
+    now_cet = datetime(2026, 3, 29, 1, 45, tzinfo=PRAGUE_TIME_ZONE)
+    curr, nxt = get_current_and_next_programme(merged, now_cet)
+    assert curr is not None and curr.title == "Night show"
+    assert nxt is not None and nxt.title == "Morning show"
+
+    now_cest = datetime(2026, 3, 29, 3, 15, tzinfo=PRAGUE_TIME_ZONE)
+    curr, nxt = get_current_and_next_programme(merged, now_cest)
+    assert curr is None
+    assert nxt is None
+
+
+def test_exact_programme_start_and_effective_end_boundaries() -> None:
+    """Current/next selection handles exact start and effective_end boundaries correctly."""
+    t1 = datetime(2026, 9, 3, 10, 0, tzinfo=PRAGUE_TIME_ZONE)
+    t2 = datetime(2026, 9, 3, 10, 30, tzinfo=PRAGUE_TIME_ZONE)
+    t3 = datetime(2026, 9, 3, 11, 0, tzinfo=PRAGUE_TIME_ZONE)
+
+    p1 = _programme(title="Show 1", start=t1)
+    p2 = _programme(title="Show 2", start=t2)
+    p3 = _programme(title="Show 3", start=t3)
+
+    programmes = merge_programmes([p1, p2, p3])
+
+    curr1, nxt1 = get_current_and_next_programme(programmes, t1)
+    assert curr1 is not None and curr1.title == "Show 1"
+    assert nxt1 is not None and nxt1.title == "Show 2"
+
+    curr2, nxt2 = get_current_and_next_programme(programmes, t2)
+    assert curr2 is not None and curr2.title == "Show 2"
+    assert nxt2 is not None and nxt2.title == "Show 3"
+
+
+def test_calendar_midnight_transitions() -> None:
+    """Schedule merging and lookup handle broadcasts spanning calendar midnight."""
+    t1 = datetime(2026, 9, 3, 23, 30, tzinfo=PRAGUE_TIME_ZONE)
+    t2 = datetime(2026, 9, 4, 0, 30, tzinfo=PRAGUE_TIME_ZONE)
+
+    p1 = _programme(title="Late Show", start=t1)
+    p2 = _programme(title="Midnight Movie", start=t2)
+
+    merged = merge_programmes([p1, p2])
+
+    assert merged[0].effective_end == t2
+
+    now_before = datetime(2026, 9, 3, 23, 45, tzinfo=PRAGUE_TIME_ZONE)
+    now_after = datetime(2026, 9, 4, 0, 15, tzinfo=PRAGUE_TIME_ZONE)
+
+    curr_b, nxt_b = get_current_and_next_programme(merged, now_before)
+    curr_a, nxt_a = get_current_and_next_programme(merged, now_after)
+
+    assert curr_b is not None and curr_b.title == "Late Show"
+    assert nxt_b is not None and nxt_b.title == "Midnight Movie"
+    assert curr_a is not None and curr_a.title == "Late Show"
+    assert nxt_a is not None and nxt_a.title == "Midnight Movie"
+
+
+def test_adjacent_broadcasting_days_merging_with_overlapping_duplicates() -> None:
+    """Merging adjacent broadcasting days deduplicates entries at day boundary and links schedule."""
+    d1_p1 = _programme(
+        title="Night News", start=datetime(2026, 9, 4, 5, 0, tzinfo=PRAGUE_TIME_ZONE), description="Draft"
+    )
+    d2_p1 = _programme(
+        title="Night News", start=datetime(2026, 9, 4, 5, 0, tzinfo=PRAGUE_TIME_ZONE), description="Final"
+    )
+    d2_p2 = _programme(title="Morning News", start=datetime(2026, 9, 4, 6, 0, tzinfo=PRAGUE_TIME_ZONE))
+
+    s1 = _schedule(broadcast_date=date(2026, 9, 3), programmes=(d1_p1,))
+    s2 = _schedule(broadcast_date=date(2026, 9, 4), programmes=(d2_p1, d2_p2))
+
+    merged = merge_schedules(s1, s2)
+
+    assert len(merged.programmes) == 2
+    assert merged.programmes[0].description == "Final"
+    assert merged.programmes[0].effective_end == datetime(2026, 9, 4, 6, 0, tzinfo=PRAGUE_TIME_ZONE)
+    assert merged.programmes[1].effective_end is None
+
+
+def test_negative_duration_overlap_uses_next_start_as_effective_end() -> None:
+    """Source duration does not control effective_end or current selection when slots overlap."""
+    t1 = datetime(2026, 9, 3, 10, 0, tzinfo=PRAGUE_TIME_ZONE)
+    t2 = datetime(2026, 9, 3, 10, 30, tzinfo=PRAGUE_TIME_ZONE)
+    t3 = datetime(2026, 9, 3, 11, 0, tzinfo=PRAGUE_TIME_ZONE)
+
+    p1 = _programme(title="Overlapping Show", start=t1, duration=timedelta(minutes=50))
+    p2 = _programme(title="Early Interruption", start=t2, duration=timedelta(minutes=30))
+    p3 = _programme(title="Next Show", start=t3, duration=timedelta(minutes=30))
+
+    programmes = merge_programmes([p1, p2, p3])
+
+    assert programmes[0].effective_end == t2
+
+    now = datetime(2026, 9, 3, 10, 35, tzinfo=PRAGUE_TIME_ZONE)
+    curr, nxt = get_current_and_next_programme(programmes, now)
+
+    assert curr is not None and curr.title == "Early Interruption"
+    assert nxt is not None and nxt.title == "Next Show"
+
+
+def test_get_current_and_next_programme_empty_schedule_returns_none() -> None:
+    """Lookup against an empty programme sequence returns (None, None)."""
+    now = datetime(2026, 9, 3, 10, 0, tzinfo=PRAGUE_TIME_ZONE)
+    assert get_current_and_next_programme([], now) == (None, None)
 
 
 def test_merge_programmes_empty_input_returns_empty_tuple() -> None:
@@ -194,7 +347,7 @@ def test_get_current_and_next_programme_during_broadcast() -> None:
 
 
 def test_get_current_and_next_programme_during_gap() -> None:
-    """Lookup during a gap between programme slots returns no current programme and the upcoming next programme."""
+    """Lookup during a programme's slot before the next start time returns that programme as current."""
     t1 = datetime(2026, 9, 3, 10, 0, tzinfo=PRAGUE_TIME_ZONE)
     t2 = datetime(2026, 9, 3, 11, 0, tzinfo=PRAGUE_TIME_ZONE)
 
