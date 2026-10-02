@@ -22,7 +22,14 @@ def _programme(
     duration: str = "025:00",
     sound: object = "S",
 ) -> research.JsonObject:
-    """Build a synthetic raw programme payload."""
+    """Build a synthetic raw programme payload.
+
+    :param day: Broadcasting day string.
+    :param clock: Programme start time string.
+    :param duration: Programme duration string.
+    :param sound: Sound metadata value.
+    :return: Synthetic raw programme mapping.
+    """
     return {
         "linky": {"program": "https://example.test/show", "ivysilani": {}},
         "datum": day,
@@ -61,7 +68,11 @@ def _programme(
 
 
 def _schedule(*programmes: research.JsonObject) -> research.JsonObject:
-    """Build a synthetic raw schedule payload."""
+    """Build a synthetic raw schedule payload.
+
+    :param *programmes: Synthetic raw programme mappings.
+    :return: Synthetic raw schedule mapping.
+    """
     return {
         "@attributes": {
             "datum_vysilani": "2026-09-02",
